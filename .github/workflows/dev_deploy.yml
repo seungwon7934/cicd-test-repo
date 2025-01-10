@@ -61,7 +61,9 @@ jobs:
         run: |
           if [[ "$(git log -1 --pretty=%B)" != *"Merge pull request"* ]]; then
             echo "Not a merge commit. Skipping deployment."
-            exit 1
+            echo "skip-deployment=true" >> $GITHUB_ENV
+          else
+            echo "skip-deployment=false" >> $GITHUB_ENV
           fi
 
       - name: Download build artifact  # 이전 단계에서 업로드한 아티팩트 다운로드
@@ -71,6 +73,7 @@ jobs:
           path: build/libs/
 
       - name: Deploy to EC2  # EC2에 배포
+        if: env.skip-deployment != 'true'  # skip-deployment가 false일 때만 실행
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
