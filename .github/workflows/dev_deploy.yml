@@ -3,6 +3,8 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]  # develop 브랜치에 push가 일어날 때 실행
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
@@ -16,6 +18,17 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      # gradle caching - 빌드 시간 향상
+      - name: Gradle Caching
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Make application.yml  # application.yml 파일 생성
         run: |
