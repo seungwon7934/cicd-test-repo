@@ -10,4 +10,24 @@ public class HelloController {
     public String hello(){
         return "hello";
     }
+
+    @GetMapping("/hello/v2")
+    public String helloV2(){
+        return "hello";
+    }
+
+    @GetMapping("/hello/v3")
+    public String helloV3(){
+        return "hello";
+    }
+
+    @GetMapping("/hello/v4")
+    public String helloV4(){
+        return "hello";
+    }
+
+    @GetMapping("/hello/v5")
+    public String helloV5(){
+        return "hello";
+    }
 }
