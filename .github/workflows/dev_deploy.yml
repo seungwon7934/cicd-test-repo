@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]  # develop 브랜치에 push가 일어날 때 실행
+    branches: [ main ]  # main 브랜치에 push가 일어날 때 실행
   pull_request:
-    branches: [ main ]
+    branches: [ main ]  # main 브랜치로 PR 생성 시 실행
 
 jobs:
   build:
@@ -56,6 +56,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check for merge commit  # Merge commit 확인
+        id: check-merge
+        run: |
+          if [[ "$(git log -1 --pretty=%B)" != *"Merge pull request"* ]]; then
+            echo "Not a merge commit. Skipping deployment."
+            exit 1
+          fi
+
       - name: Download build artifact  # 이전 단계에서 업로드한 아티팩트 다운로드
         uses: actions/download-artifact@v3
         with:
@@ -67,44 +75,14 @@ jobs:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
-
         run: |
-          # 1. SSH 키 설정
           echo "$EC2_SSH_KEY" > private_key.pem
           chmod 600 private_key.pem
-
-          # 2. 소스 코드 전송
-          scp -i private_key.pem -o StrictHostKeyChecking=no -r . $EC2_USERNAME@$EC2_HOST:/home/$EC2_USERNAME/cicd-repo
-
-          # 3. EC2에서 빌드 및 실행
+          jar_file=$(find build/libs -name '*.jar' ! -name '*plain.jar' | head -n 1)
+          scp -i private_key.pem -o StrictHostKeyChecking=no "$jar_file" $EC2_USERNAME@$EC2_HOST:/home/$EC2_USERNAME/cicdtestrepo.jar
           ssh -i private_key.pem -o StrictHostKeyChecking=no $EC2_USERNAME@$EC2_HOST "
-            # Java 프로세스 종료
-            pgrep java | xargs -r kill -15
+            pgrep java | xargs -r kill -15  # 기존에 실행 중인 Java 프로세스 종료
             sleep 10
-
-            # 소스 디렉토리 이동
-            cd /home/$EC2_USERNAME/cicd-repo
-
-            # Gradle 빌드 (필요 시 -x test 플래그 추가 가능)
-            ./gradlew build -x test
-
-            # JAR 파일 실행
-            jar_file=\$(find build/libs -name '*.jar' ! -name '*plain.jar' | head -n 1)
-            nohup java -jar \$jar_file > /home/$EC2_USERNAME/app.log 2>&1 &
+            nohup java -jar /home/$EC2_USERNAME/cicdtestrepo.jar > app.log 2>&1 &  # 새 버전 애플리케이션 실행
           "
-
-          # 민감한 정보 삭제
-          rm -f private_key.pem
-
-#        run: |
-#          echo "$EC2_SSH_KEY" > private_key.pem
-#          chmod 600 private_key.pem
-#          jar_file=$(find build/libs -name '*.jar' ! -name '*plain.jar' | head -n 1)
-#          scp -i private_key.pem -o StrictHostKeyChecking=no "$jar_file" $EC2_USERNAME@$EC2_HOST:/home/$EC2_USERNAME/cicdtestrepo.jar
-#          ssh -i private_key.pem -o StrictHostKeyChecking=no $EC2_USERNAME@$EC2_HOST "
-#            pgrep java | xargs -r kill -15  # 기존에 실행 중인 Java 프로세스 종료
-#            sleep 10
-#            nohup java -jar /home/$EC2_USERNAME/cicdtestrepo.jar > app.log 2>&1 &  # 새 버전 애플리케이션 실행
-#          "
-#          rm -f private_key.pem  # 민감한 정보 삭제
-
+          rm -f private_key.pem  # 민감한 정보 삭제
